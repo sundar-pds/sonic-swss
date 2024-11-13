@@ -288,6 +288,13 @@ bool OrchDaemon::init()
     DashAclOrch *dash_acl_orch = new DashAclOrch(m_applDb, dash_acl_tables, dash_orch, m_zmqServer);
     gDirectory.set(dash_acl_orch);
 
+    vector<string> dash_meter_tables = {
+        APP_DASH_METER_POLICY_TABLE_NAME,
+        APP_DASH_METER_RULE_TABLE_NAME
+    };
+    DashMeterOrch *dash_meter_orch = new DashMeterOrch(m_applDb, dash_meter_tables, dash_orch, m_zmqServer);
+    gDirectory.set(dash_meter_orch);
+
     vector<string> qos_tables = {
         CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
         CFG_SCHEDULER_TABLE_NAME,
