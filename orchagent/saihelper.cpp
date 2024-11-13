@@ -86,6 +86,7 @@ sai_dash_vip_api_t*                 sai_dash_vip_api;
 sai_dash_direction_lookup_api_t*    sai_dash_direction_lookup_api;
 sai_twamp_api_t*                    sai_twamp_api;
 sai_tam_api_t*                      sai_tam_api;
+sai_dash_meter_api_t*               sai_dash_meter_api;
 
 extern sai_object_id_t gSwitchId;
 extern bool gTraditionalFlexCounter;
