@@ -531,6 +531,7 @@ bool OrchDaemon::init()
     m_orchList.push_back(dash_acl_orch);
     m_orchList.push_back(dash_vnet_orch);
     m_orchList.push_back(dash_route_orch);
+    m_orchList.push_back(dash_meter_orch);
     m_orchList.push_back(dash_orch);
 
     if (m_fabricEnabled)
