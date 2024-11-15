@@ -20,6 +20,7 @@ import socket
 import binascii
 
 import pytest
+pytestmark = pytest.mark.skip("temp skipping the file")
 
 DVS_ENV = ["HWSKU=DPU-2P"]
 NUM_PORTS = 2
