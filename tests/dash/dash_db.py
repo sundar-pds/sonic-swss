@@ -13,6 +13,8 @@ from dash_api.route_group_pb2 import *
 from dash_api.route_rule_pb2 import *
 from dash_api.vnet_mapping_pb2 import *
 from dash_api.route_type_pb2 import *
+from dash_api.meter_policy_pb2 import *
+from dash_api.meter_rule_pb2 import *
 from dash_api.types_pb2 import *
 from google.protobuf.json_format import ParseDict
 from google.protobuf.message import Message
