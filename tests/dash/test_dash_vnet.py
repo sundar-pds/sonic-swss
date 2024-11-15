@@ -245,6 +245,8 @@ class TestDash(TestFlexCountersBase):
         self.ip2 = "10.1.1.2"
         self.appliance_id = "100"
         self.routing_type = "vnet_encap"
+        self.meter_policy_id = METER_POLICY1
+        self.meter_rule_num = "4"
         dash_db.remove_inbound_routing(self.mac_string, self.vni, self.sip)
         dash_db.remove_eni_route(self.mac_string)
         dash_db.remove_route(self.group_id, self.dip)
