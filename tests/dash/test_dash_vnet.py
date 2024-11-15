@@ -7,6 +7,8 @@ from dash_api.route_group_pb2 import *
 from dash_api.route_rule_pb2 import *
 from dash_api.vnet_mapping_pb2 import *
 from dash_api.route_type_pb2 import *
+from dash_api.meter_policy_pb2 import *
+from dash_api.meter_rule_pb2 import *
 from dash_api.types_pb2 import *
 from dvslib.dvs_flex_counter import TestFlexCountersBase
 
@@ -17,6 +19,7 @@ import time
 import uuid
 import ipaddress
 import socket
+import binascii
 
 from dvslib.sai_utils import assert_sai_attribute_exists
 
@@ -71,6 +74,40 @@ class TestDash(TestFlexCountersBase):
             self.wait_for_id_list_remove(meta_data['group_name'], counter_entry[0], counter_entry[1])
         self.wait_for_table_empty(meta_data['name_map'])
 
+    def to_ip_prefix(prefix):
+        net = ipaddress.IPv4Network(prefix, False)
+        pfx = IpPrefix()
+        pfx.ip.ipv4 = socket.htonl(int(net.network_address))
+        pfx.mask.ipv4 = socket.htonl(int(net.netmask))
+        return pfx
+
+    def test_meter(self, dash_db: DashDB):
+        self.meter_policy_id = METER_POLICY1
+        pb = MeterPolicy()
+        pb.ip_version = IpVersion.IP_VERSION_IPV4
+        dash_db.create_meter_policy(self.meter_policy_id, {"pb": pb.SerializeToString()})
+
+        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
+        policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, meter_policy_entries[0])
+        assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
+
+        self.meter_policy_id = METER_POLICY1
+        self.meter_rule_num = "4"
+        self.priority = "21"
+        self.metering_class = "51"
+        self.ip_prefix = "192.168.61.0/30"
+        pb = MeterRule()
+        pb.priority = int(self.priority)
+        pb.ip_prefix = to_ip_prefix(self.ip_prefix)
+        pb.metering_class = int(self.metering_class)
+        dash_db.create_meter_rule(self.meter_policy_id, self.meter_rule_num, {"pb": pb.SerializeToString()})
+
+        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE)
+        rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, meter_rule_entries[0])
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_PRIORITY", rule_attrs, self.priority)
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_CLASS", rule_attrs, self.metering_class)
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, meter_policy_entries[0])
+
     def test_eni(self, dash_db: DashDB):
         self.vnet = "Vnet1"
         self.mac_string = "F4939FEFC47E"
@@ -106,6 +143,12 @@ class TestDash(TestFlexCountersBase):
         pb.admin_state = State.STATE_DISABLED
         dash_db.create_eni(self.mac_string, {"pb": pb.SerializeToString()})
         dash_db.wait_for_asic_db_field(ASIC_ENI_TABLE, self.eni_oid, "SAI_ENI_ATTR_ADMIN_STATE", "false")
+
+        # test eni v4 meter policy bind
+        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=1)
+        pb.v4_meter_policy_id = METER_POLICY1
+        dash_db.create_eni(self.mac_string, {"pb": pb.SerializeToString()})
+        dash_db.wait_for_asic_db_field(ASIC_ENI_TABLE, self.eni_oid, "SAI_ENI_ATTR_V4_METER_POLICY_ID", meter_policy_entries[0])
 
     def test_vnet_map(self, dash_db: DashDB):
         self.vnet = "Vnet1"
@@ -210,6 +253,8 @@ class TestDash(TestFlexCountersBase):
         dash_db.remove_vnet_mapping(self.vnet, self.ip2)
         dash_db.remove_routing_type(self.routing_type)
         dash_db.remove_eni(self.mac_string)
+        dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
+        dash_db.remove_meter_policy(self.meter_policy_id)
         dash_db.remove_vnet(self.vnet)
         dash_db.remove_appliance(self.appliance_id)
 
