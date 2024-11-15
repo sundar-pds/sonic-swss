@@ -273,7 +273,7 @@ class DashDB(object):
         del self.app_dash_meter_policy_table[str(meter_policy)]
 
     def create_meter_rule(self, meter_policy, rule_num, attr_maps: dict):
-        self.app_dash_meter_rule_table[str(meter_rule) + ":" + str(rule_num)] = attr_maps
+        self.app_dash_meter_rule_table[str(meter_policy) + ":" + str(rule_num)] = attr_maps
 
     def remove_meter_rule(self, meter_policy, rule_num):
-        del self.app_dash_meter_rule_table[str(meter_rule) + ":" + str(rule_num)]
+        del self.app_dash_meter_rule_table[str(meter_policy) + ":" + str(rule_num)]
