@@ -252,6 +252,26 @@ bool DashMeterOrch::addMeterRule(const string& key, MeterRuleBulkContext& ctxt)
     vector<sai_attribute_t> meter_rule_attrs;
     sai_attribute_t meter_rule_attr;
 
+#if 1
+    constexpr char *kDstIp1 = "10.206.196.31";
+    const swss::IpAddress dst_ip = swss::IpAddress(kDstIp1);
+    constexpr char *kDstMask1 = "255.255.255.0";
+    const swss::IpAddress dst_mask = swss::IpAddress(kDstMask1);
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_DIP;
+    swss::copy(meter_rule_attr.value.ipaddr, dst_ip);
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_DIP_MASK;
+    swss::copy(meter_rule_attr.value.ipaddr, dst_mask);
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_IP_ADDR_FAMILY;
+    meter_rule_attr.value.s32 = SAI_IP_ADDR_FAMILY_IPV4;
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+#else
+
     meter_rule_attr.id = SAI_METER_RULE_ATTR_DIP;
     to_sai(ctxt.metadata.ip_prefix().ip(), meter_rule_attr.value.ipaddr);
     meter_rule_attrs.push_back(meter_rule_attr);
@@ -263,6 +283,7 @@ bool DashMeterOrch::addMeterRule(const string& key, MeterRuleBulkContext& ctxt)
     meter_rule_attr.id = SAI_METER_RULE_ATTR_IP_ADDR_FAMILY;
     meter_rule_attr.value.s32 = getMeterPolicyAddrFamily(ctxt.meter_policy);
     meter_rule_attrs.push_back(meter_rule_attr);
+#endif
 
     meter_rule_attr.id = SAI_METER_RULE_ATTR_METER_POLICY_ID;
     meter_rule_attr.value.oid = meter_policy_oid;

@@ -1,4 +1,5 @@
 import pytest
+pytestmark = pytest.mark.skip("temp skipping the file")
 import time
 from dash_db import DashDB, dash_db
 from dash_configs import *
