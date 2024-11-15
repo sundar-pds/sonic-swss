@@ -33,6 +33,13 @@ eni_counter_group_meta = {
 DVS_ENV = ["HWSKU=DPU-2P"]
 NUM_PORTS = 2
 
+def to_ip_prefix(prefix):
+    net = ipaddress.IPv4Network(prefix, False)
+    pfx = IpPrefix()
+    pfx.ip.ipv4 = socket.htonl(int(net.network_address))
+    pfx.mask.ipv4 = socket.htonl(int(net.netmask))
+    return pfx
+
 class TestDash(TestFlexCountersBase):
     def test_appliance(self, dash_db: DashDB):
         self.appliance_id = "100"
@@ -74,12 +81,6 @@ class TestDash(TestFlexCountersBase):
             self.wait_for_id_list_remove(meta_data['group_name'], counter_entry[0], counter_entry[1])
         self.wait_for_table_empty(meta_data['name_map'])
 
-    def to_ip_prefix(prefix):
-        net = ipaddress.IPv4Network(prefix, False)
-        pfx = IpPrefix()
-        pfx.ip.ipv4 = socket.htonl(int(net.network_address))
-        pfx.mask.ipv4 = socket.htonl(int(net.netmask))
-        return pfx
 
     def test_meter(self, dash_db: DashDB):
         self.meter_policy_id = METER_POLICY1
