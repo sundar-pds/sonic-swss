@@ -33,13 +33,6 @@ eni_counter_group_meta = {
 DVS_ENV = ["HWSKU=DPU-2P"]
 NUM_PORTS = 2
 
-def to_ip_prefix(prefix):
-    net = ipaddress.IPv4Network(prefix, False)
-    pfx = IpPrefix()
-    pfx.ip.ipv4 = socket.htonl(int(net.network_address))
-    pfx.mask.ipv4 = socket.htonl(int(net.netmask))
-    return pfx
-
 class TestDash(TestFlexCountersBase):
     def test_appliance(self, dash_db: DashDB):
         self.appliance_id = "100"
@@ -90,24 +83,28 @@ class TestDash(TestFlexCountersBase):
 
         meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
         policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, meter_policy_entries[0])
-        ### assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
+        assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
 
         self.meter_policy_id = METER_POLICY1
         self.meter_rule_num = "4"
         self.priority = "21"
         self.metering_class = "51"
-        self.ip_prefix = "192.168.61.0/30"
+        self.prefix_ip = "192.168.68.0"
+        self.prefix_mask = "255.255.255.0"
         pb = MeterRule()
         pb.priority = int(self.priority)
-        ###pb.ip_prefix = to_ip_prefix(self.ip_prefix)
         pb.metering_class = int(self.metering_class)
+        pb.ip_prefix.ip.ipv4 = socket.htonl(int(ipaddress.ip_address(self.prefix_ip)))
+        pb.ip_prefix.mask.ipv4 = socket.htonl(int(ipaddress.ip_address(self.prefix_mask)))
         dash_db.create_meter_rule(self.meter_policy_id, self.meter_rule_num, {"pb": pb.SerializeToString()})
 
         meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE)
         rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, meter_rule_entries[0])
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_PRIORITY", rule_attrs, self.priority)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_CLASS", rule_attrs, self.metering_class)
-        ###assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, meter_policy_entries[0])
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, meter_policy_entries[0])
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP", rule_attrs, self.prefix_ip)
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP_MASK", rule_attrs, self.prefix_mask)
 
     def test_eni(self, dash_db: DashDB):
         self.vnet = "Vnet1"
@@ -122,8 +119,10 @@ class TestDash(TestFlexCountersBase):
         pb.underlay_ip.ipv4 = socket.htonl(int(ipaddress.ip_address(self.underlay_ip)))
         pb.admin_state = State.STATE_ENABLED
         pb.vnet = self.vnet
+        pb.v4_meter_policy_id = METER_POLICY1
         dash_db.create_eni(self.mac_string, {"pb": pb.SerializeToString()})
         
+        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
         vnets = dash_db.wait_for_asic_db_keys(ASIC_VNET_TABLE)
         self.vnet_oid = vnets[0]
         enis = dash_db.wait_for_asic_db_keys(ASIC_ENI_TABLE)
@@ -132,6 +131,7 @@ class TestDash(TestFlexCountersBase):
 
         assert_sai_attribute_exists("SAI_ENI_ATTR_VNET_ID", attrs, str(self.vnet_oid))
         assert_sai_attribute_exists("SAI_ENI_ATTR_ADMIN_STATE", attrs, "true")
+        assert_sai_attribute_exists("SAI_ENI_ATTR_V4_METER_POLICY_ID", attrs, meter_policy_entries[0]);
 
         time.sleep(1)
         self.verify_flex_counter_flow(dash_db.dvs, eni_counter_group_meta)
@@ -144,12 +144,6 @@ class TestDash(TestFlexCountersBase):
         pb.admin_state = State.STATE_DISABLED
         dash_db.create_eni(self.mac_string, {"pb": pb.SerializeToString()})
         dash_db.wait_for_asic_db_field(ASIC_ENI_TABLE, self.eni_oid, "SAI_ENI_ATTR_ADMIN_STATE", "false")
-
-        # test eni v4 meter policy bind
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=1)
-        pb.v4_meter_policy_id = METER_POLICY1
-        dash_db.create_eni(self.mac_string, {"pb": pb.SerializeToString()})
-        dash_db.wait_for_asic_db_field(ASIC_ENI_TABLE, self.eni_oid, "SAI_ENI_ATTR_V4_METER_POLICY_ID", meter_policy_entries[0])
 
     def test_vnet_map(self, dash_db: DashDB):
         self.vnet = "Vnet1"

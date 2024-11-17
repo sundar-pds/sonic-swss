@@ -47,7 +47,7 @@ ROUTE_GROUP1 = "RouteGroup1"
 ROUTE_GROUP2 = "RouteGroup2"
 ROUTE_GROUP1_GUID = "48af6ce8-26cc-4293-bfa6-0126e8fcdeb2"
 ROUTE_GROUP2_GUID = "58cf62e0-22cc-4693-baa6-012358fcdec9"
-METER_POLICY1 = "RoutePolicy1"
+METER_POLICY1 = "DashMeterPolicy1"
 
 APPLIANCE_CONFIG = {
     "sip": {
