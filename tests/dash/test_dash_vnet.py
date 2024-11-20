@@ -7,8 +7,6 @@ from dash_api.route_group_pb2 import *
 from dash_api.route_rule_pb2 import *
 from dash_api.vnet_mapping_pb2 import *
 from dash_api.route_type_pb2 import *
-from dash_api.meter_policy_pb2 import *
-from dash_api.meter_rule_pb2 import *
 from dash_api.types_pb2 import *
 from dvslib.dvs_flex_counter import TestFlexCountersBase
 
@@ -73,38 +71,6 @@ class TestDash(TestFlexCountersBase):
             self.wait_for_id_list_remove(meta_data['group_name'], counter_entry[0], counter_entry[1])
         self.wait_for_table_empty(meta_data['name_map'])
 
-
-    def test_meter(self, dash_db: DashDB):
-        self.meter_policy_id = METER_POLICY1
-        pb = MeterPolicy()
-        pb.ip_version = IpVersion.IP_VERSION_IPV4
-        dash_db.create_meter_policy(self.meter_policy_id, {"pb": pb.SerializeToString()})
-
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
-        policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, meter_policy_entries[0])
-        assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
-
-        self.meter_policy_id = METER_POLICY1
-        self.meter_rule_num = "4"
-        self.priority = "21"
-        self.metering_class = "51"
-        self.prefix_ip = "192.168.68.0"
-        self.prefix_mask = "255.255.255.0"
-        pb = MeterRule()
-        pb.priority = int(self.priority)
-        pb.metering_class = int(self.metering_class)
-        pb.ip_prefix.ip.ipv4 = socket.htonl(int(ipaddress.ip_address(self.prefix_ip)))
-        pb.ip_prefix.mask.ipv4 = socket.htonl(int(ipaddress.ip_address(self.prefix_mask)))
-        dash_db.create_meter_rule(self.meter_policy_id, self.meter_rule_num, {"pb": pb.SerializeToString()})
-
-        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE)
-        rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, meter_rule_entries[0])
-        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_PRIORITY", rule_attrs, self.priority)
-        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_CLASS", rule_attrs, self.metering_class)
-        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, meter_policy_entries[0])
-        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP", rule_attrs, self.prefix_ip)
-        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP_MASK", rule_attrs, self.prefix_mask)
-
     def test_eni(self, dash_db: DashDB):
         self.vnet = "Vnet1"
         self.mac_string = "F4939FEFC47E"
@@ -118,10 +84,8 @@ class TestDash(TestFlexCountersBase):
         pb.underlay_ip.ipv4 = socket.htonl(int(ipaddress.ip_address(self.underlay_ip)))
         pb.admin_state = State.STATE_ENABLED
         pb.vnet = self.vnet
-        pb.v4_meter_policy_id = METER_POLICY1
         dash_db.create_eni(self.mac_string, {"pb": pb.SerializeToString()})
         
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
         vnets = dash_db.wait_for_asic_db_keys(ASIC_VNET_TABLE)
         self.vnet_oid = vnets[0]
         enis = dash_db.wait_for_asic_db_keys(ASIC_ENI_TABLE)
@@ -130,7 +94,6 @@ class TestDash(TestFlexCountersBase):
 
         assert_sai_attribute_exists("SAI_ENI_ATTR_VNET_ID", attrs, str(self.vnet_oid))
         assert_sai_attribute_exists("SAI_ENI_ATTR_ADMIN_STATE", attrs, "true")
-        assert_sai_attribute_exists("SAI_ENI_ATTR_V4_METER_POLICY_ID", attrs, meter_policy_entries[0]);
 
         time.sleep(1)
         self.verify_flex_counter_flow(dash_db.dvs, eni_counter_group_meta)
@@ -254,8 +217,6 @@ class TestDash(TestFlexCountersBase):
         self.ip2 = "10.1.1.2"
         self.appliance_id = "100"
         self.routing_type = "vnet_encap"
-        self.meter_policy_id = METER_POLICY1
-        self.meter_rule_num = "4"
         dash_db.remove_inbound_routing(self.mac_string, self.vni, self.sip)
         dash_db.remove_eni_route(self.mac_string)
         dash_db.remove_route(self.group_id, self.dip)
@@ -264,8 +225,6 @@ class TestDash(TestFlexCountersBase):
         dash_db.remove_vnet_mapping(self.vnet, self.ip2)
         dash_db.remove_routing_type(self.routing_type)
         dash_db.remove_eni(self.mac_string)
-        dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
-        dash_db.remove_meter_policy(self.meter_policy_id)
         dash_db.remove_vnet(self.vnet)
         dash_db.remove_appliance(self.appliance_id)
 
