@@ -131,9 +131,9 @@ class TestDash(TestFlexCountersBase):
         assert_sai_attribute_exists("SAI_ENI_ATTR_V4_METER_POLICY_ID", attrs, meter_policy_entries[0]);
         assert_sai_attribute_exists("SAI_ENI_ATTR_V6_METER_POLICY_ID", attrs, meter_policy_entries[1]);
 
-    def D_test_unsupported(self, dash_db: DashDB):
-        self.meter_policy_id = METER_POLICY1
-        elf.meter_rule_num = "4"
+    def test_unsupported(self, dash_db: DashDB):
+        self.meter_policy_id = METER_POLICY_V4
+        self.meter_rule_num = METER_RULE_1_NUM
         self.mac_string = "F4939FEFC47E"
 
         #dash_db.remove_eni(self.mac_string)
@@ -141,15 +141,15 @@ class TestDash(TestFlexCountersBase):
 
 	# bound policy cannot edit rule
         dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
-        time.sleep(20)
-        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE)
+        dash_db.remove_meter_policy(self.meter_policy_id)
+        time.sleep(30)
+        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=2)
 
 	# bound policy cannot remove policy
-        dash_db.remove_meter_policy(self.meter_policy_id)
-        time.sleep(20)
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
+        time.sleep(30)
+        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=2)
 
-	# bind to not created policy
+	# bind to not created policy..TODO
 
     def test_cleanup(self, dash_db: DashDB):
         self.vnet = VNET1
