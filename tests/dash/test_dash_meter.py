@@ -156,15 +156,25 @@ class TestDash(TestFlexCountersBase):
         self.meter_policy_id = METER_POLICY_V4
         self.meter_rule_num = METER_RULE_1_NUM
         self.mac_string = "F4939FEFC47E"
+        policy_found = False
+        rule_found = False
 
 	### verify meter rule/policy cannot be removed with ENI bound
         dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
         dash_db.remove_meter_policy(self.meter_policy_id)
         time.sleep(30)
-        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES)
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
-        assert meter_policy_entries[0] == policy_v4_oid
-        assert meter_rule_entries[0] == rule_v4_oid
+        meter_rule_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES)
+        meter_policy_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
+        for oid in meter_policy_oids:
+            if oid == policy_v4_oid:
+                policy_found = True
+                break
+        for oid in meter_rule_oids:
+            if oid == rule_v4_oid:
+                rule_found = True
+                break
+        assert(policy_found)
+        assert(rule_found)
 
         ### Remove ENI to allow meter rule/policy delete.
         dash_db.remove_eni(self.mac_string)
