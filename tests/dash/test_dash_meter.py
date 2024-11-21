@@ -83,9 +83,10 @@ class TestDash(TestFlexCountersBase):
         policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, policy_v4_oid)
         assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
 
-        self.meter_rule_num_v4 = METER_RULE_1_NUM
+        rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=0)
         dash_db.set_app_db_entry("DASH_METER_RULE_TABLE", METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
 
+        rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=1)[0]
         rule_v4_oid = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=1)[0]
         rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, rule_v4_oid)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_PRIORITY", rule_attrs, METER_RULE_1_PRIORITY)
@@ -93,6 +94,12 @@ class TestDash(TestFlexCountersBase):
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, policy_v4_oid)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP", rule_attrs, METER_RULE_1_IP)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP_MASK", rule_attrs, METER_RULE_1_IP_MASK)
+
+        ## delete and recreate v4 rule
+        dash_db.remove_meter_rule(METER_POLICY_V4, METER_RULE_1_NUM)
+        rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=0)
+        dash_db.set_app_db_entry("DASH_METER_RULE_TABLE", METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
+        rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=1)
 
     def test_v6_meter(self, dash_db: DashDB):
         global policy_v6_oid
@@ -161,9 +168,10 @@ class TestDash(TestFlexCountersBase):
 
 	### verify meter rule/policy cannot be removed with ENI bound
         dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
-        dash_db.remove_meter_policy(self.meter_policy_id)
-        time.sleep(30)
+        time.sleep(20)
         meter_rule_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES)
+        dash_db.remove_meter_policy(self.meter_policy_id)
+        time.sleep(20)
         meter_policy_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
         for oid in meter_policy_oids:
             if oid == policy_v4_oid:
@@ -178,15 +186,28 @@ class TestDash(TestFlexCountersBase):
 
         ### Remove ENI to allow meter rule/policy delete.
         dash_db.remove_eni(self.mac_string)
-        time.sleep(30)
+        time.sleep(20)
 
         dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
+        time.sleep(20)
+        meter_rule_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, exact_keys=ENTRIES-1)
         dash_db.remove_meter_policy(self.meter_policy_id)
-        time.sleep(30)
-        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES-1)
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES-1)
-        assert meter_policy_entries[0] == policy_v6_oid
-        assert meter_rule_entries[0] == rule_v6_oid
+        time.sleep(20)
+        meter_policy_oids = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_POLICY_TABLE, exact_keys=ENTRIES-1)
+
+        assert meter_policy_oids[0] == policy_v6_oid
+        assert meter_rule_oids[0] == rule_v6_oid
+
+        #for oid in meter_policy_oids:
+        #    if oid == policy_v6_oid:
+        #        policy_found = True
+        #        break
+        #for oid in meter_rule_oids:
+        #    if oid == rule_v6_oid:
+        #        rule_found = True
+        #        break
+        #assert(policy_found)
+        #assert(rule_found)
 
 	# bind to not created policy..TODO
 

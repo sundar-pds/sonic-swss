@@ -81,6 +81,7 @@ bool DashMeterOrch::removeMeterRulePost(const string& key, const MeterRuleBulkCo
 
     gCrmOrch->decCrmResUsedCounter(isV4(ctxt.meter_policy) ? CrmResourceType::CRM_DASH_IPV4_METER_RULE : CrmResourceType::CRM_DASH_IPV6_METER_RULE);
     meter_rule_entries_.erase(key);
+    decrMeterPolicyRuleCount(ctxt.meter_policy);
     SWSS_LOG_INFO("Meter rule entry removed for %s", key.c_str());
 
     return true;
