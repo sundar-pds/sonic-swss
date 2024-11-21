@@ -32,6 +32,11 @@ from swsscommon.swsscommon import (
 DVS_ENV = ["HWSKU=DPU-2P"]
 NUM_PORTS = 2
 
+ENTRIES = 2
+policy_v4_oid = 0
+policy_v6_oid = 0
+rule_v4_oid = 0
+rule_v6_oid = 0
 
 class TestDash(TestFlexCountersBase):
     def test_appliance(self, dash_db: DashDB):
@@ -67,42 +72,59 @@ class TestDash(TestFlexCountersBase):
         assert_sai_attribute_exists("SAI_VNET_ATTR_VNI", vnet_attr, self.vni)
 
     def test_v4_meter(self, dash_db: DashDB):
+        global policy_v4_oid
+        global rule_v4_oid
         self.meter_policy_id = METER_POLICY_V4
         pb = MeterPolicy()
         pb.ip_version = IpVersion.IP_VERSION_IPV4
         dash_db.create_meter_policy(self.meter_policy_id, {"pb": pb.SerializeToString()})
 
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
-        policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, meter_policy_entries[0])
+        policy_v4_oid = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)[0]
+        policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, policy_v4_oid)
         assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
 
         self.meter_rule_num_v4 = METER_RULE_1_NUM
         dash_db.set_app_db_entry("DASH_METER_RULE_TABLE", METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
-        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=1)
-        rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, meter_rule_entries[0])
+
+        rule_v4_oid = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=1)[0]
+        rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, rule_v4_oid)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_PRIORITY", rule_attrs, METER_RULE_1_PRIORITY)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_CLASS", rule_attrs, METER_RULE_1_METERING_CLASS)
-        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, meter_policy_entries[0])
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, policy_v4_oid)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP", rule_attrs, METER_RULE_1_IP)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP_MASK", rule_attrs, METER_RULE_1_IP_MASK)
 
     def test_v6_meter(self, dash_db: DashDB):
+        global policy_v6_oid
+        global rule_v6_oid
         self.meter_policy_id = METER_POLICY_V6
         pb = MeterPolicy()
         pb.ip_version = IpVersion.IP_VERSION_IPV6
         dash_db.create_meter_policy(self.meter_policy_id, {"pb": pb.SerializeToString()})
 
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=2)
-        policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, meter_policy_entries[1])
+        oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=2)
+        for oid in oids:
+            if oid != policy_v4_oid:
+                policy_v6_oid = oid
+                break
+        policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, policy_v6_oid)
+
         assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV6")
 
         self.meter_rule_num_v6 = METER_RULE_2_NUM
         dash_db.set_app_db_entry("DASH_METER_RULE_TABLE", METER_POLICY_V6, self.meter_rule_num_v6, METER_RULE_2_CONFIG)
-        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=2)
-        rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, meter_rule_entries[1])
+        time.sleep(10)
+
+        oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=2)
+        for oid in oids:
+            if oid != rule_v4_oid:
+                rule_v6_oid = oid
+                break
+        rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, rule_v6_oid)
+
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_PRIORITY", rule_attrs, METER_RULE_2_PRIORITY)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_CLASS", rule_attrs, METER_RULE_2_METERING_CLASS)
-        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, meter_policy_entries[1])
+        assert_sai_attribute_exists("SAI_METER_RULE_ATTR_METER_POLICY_ID", rule_attrs, policy_v6_oid)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP", rule_attrs, METER_RULE_2_IP)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP_MASK", rule_attrs, METER_RULE_2_IP_MASK)
 
@@ -123,31 +145,38 @@ class TestDash(TestFlexCountersBase):
         pb.v6_meter_policy_id = METER_POLICY_V6
         dash_db.create_eni(self.mac_string, {"pb": pb.SerializeToString()})
         
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
         enis = dash_db.wait_for_asic_db_keys(ASIC_ENI_TABLE)
         self.eni_oid = enis[0]
         attrs = dash_db.get_asic_db_entry(ASIC_ENI_TABLE, self.eni_oid)
 
-        assert_sai_attribute_exists("SAI_ENI_ATTR_V4_METER_POLICY_ID", attrs, meter_policy_entries[0]);
-        assert_sai_attribute_exists("SAI_ENI_ATTR_V6_METER_POLICY_ID", attrs, meter_policy_entries[1]);
+        assert_sai_attribute_exists("SAI_ENI_ATTR_V4_METER_POLICY_ID", attrs, policy_v4_oid);
+        assert_sai_attribute_exists("SAI_ENI_ATTR_V6_METER_POLICY_ID", attrs, policy_v6_oid);
 
     def test_unsupported(self, dash_db: DashDB):
         self.meter_policy_id = METER_POLICY_V4
         self.meter_rule_num = METER_RULE_1_NUM
         self.mac_string = "F4939FEFC47E"
 
-        #dash_db.remove_eni(self.mac_string)
-        #time.sleep(20)
-
-	# bound policy cannot edit rule
+	### verify meter rule/policy cannot be removed with ENI bound
         dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
         dash_db.remove_meter_policy(self.meter_policy_id)
         time.sleep(30)
-        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=2)
+        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES)
+        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
+        assert meter_policy_entries[0] == policy_v4_oid
+        assert meter_rule_entries[0] == rule_v4_oid
 
-	# bound policy cannot remove policy
+        ### Remove ENI to allow meter rule/policy delete.
+        dash_db.remove_eni(self.mac_string)
         time.sleep(30)
-        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=2)
+
+        dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
+        dash_db.remove_meter_policy(self.meter_policy_id)
+        time.sleep(30)
+        meter_rule_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES-1)
+        meter_policy_entries = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES-1)
+        assert meter_policy_entries[0] == policy_v6_oid
+        assert meter_rule_entries[0] == rule_v6_oid
 
 	# bind to not created policy..TODO
 
