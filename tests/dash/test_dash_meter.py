@@ -93,9 +93,9 @@ class TestDash(TestFlexCountersBase):
 
         ####### delete and recreate v4 rule
         ##dash_db.remove_meter_rule(METER_POLICY_V4, METER_RULE_1_NUM)
-        ##rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=0)
+        ##rule_v4_oid = dash_db.wait_for_asic_db_num_keys(ASIC_METER_RULE_TABLE, num_expected=0)
         ##dash_db.set_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
-        ##rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=1)
+        ##rule_v4_oid = dash_db.wait_for_asic_db_num_keys(ASIC_METER_RULE_TABLE, num_expected=1)
 
     def test_v6_meter(self, dash_db: DashDB):
         global policy_v6_oid
@@ -165,7 +165,7 @@ class TestDash(TestFlexCountersBase):
         ### verify meter policy cannot be removed with ENI bound
         dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
         dash_db.remove_meter_policy(self.meter_policy_id)
-        time.sleep(30)
+        time.sleep(20)
         meter_rule_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES)
         meter_policy_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
         for oid in meter_policy_oids:
@@ -181,13 +181,10 @@ class TestDash(TestFlexCountersBase):
 
         ### Remove ENI to allow meter rule/policy delete.
         dash_db.remove_eni(self.mac_string)
-        time.sleep(30)
-
         dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
         dash_db.remove_meter_policy(self.meter_policy_id)
-        time.sleep(30)
-        meter_rule_oids = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=ENTRIES-1)
-        meter_policy_oids = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_POLICY_TABLE, exact_keys=ENTRIES-1)
+        meter_rule_oids = dash_db.wait_for_asic_db_num_keys(ASIC_METER_RULE_TABLE, num_expected=ENTRIES-1)
+        meter_policy_oids = dash_db.wait_for_asic_db_num_keys(ASIC_METER_POLICY_TABLE, num_expected=ENTRIES-1)
 
         assert meter_policy_oids[0] == policy_v6_oid
         assert meter_rule_oids[0] == rule_v6_oid
