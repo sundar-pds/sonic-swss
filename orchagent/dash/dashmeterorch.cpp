@@ -94,7 +94,8 @@ void DashMeterOrch::decrMeterPolicyRuleCount(const string& meter_policy)
         }
         else
         {
-            SWSS_LOG_WARN("Meter policy %s invalid rule count %d before decr", meter_policy.c_str(), it->second.rule_count);
+            SWSS_LOG_WARN("Meter policy %s invalid rule count %d before decr", 
+                           meter_policy.c_str(), it->second.rule_count);
         }
     }
     else
