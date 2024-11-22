@@ -24,8 +24,8 @@ from dvslib.sai_utils import assert_sai_attribute_exists
 from dvslib.dvs_common import PollingConfig, wait_for_result
 
 from swsscommon.swsscommon import (
-    #APP_DASH_METER_POLICY_TABLE_NAME,
-    #APP_DASH_METER_RULE_TABLE_NAME,
+    APP_DASH_METER_POLICY_TABLE_NAME,
+    APP_DASH_METER_RULE_TABLE_NAME,
     APP_DASH_ENI_TABLE_NAME,
 )
 
@@ -82,8 +82,7 @@ class TestDash(TestFlexCountersBase):
         policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, policy_v4_oid)
         assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
 
-        #dash_db.set_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
-        dash_db.set_app_db_entry("DASH_METER_RULE_TABLE", METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
+        dash_db.set_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
         rule_v4_oid = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE)[0]
         rule_attrs = dash_db.get_asic_db_entry(ASIC_METER_RULE_TABLE, rule_v4_oid)
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_PRIORITY", rule_attrs, METER_RULE_1_PRIORITY)
@@ -95,7 +94,7 @@ class TestDash(TestFlexCountersBase):
         ####### delete and recreate v4 rule
         ##dash_db.remove_meter_rule(METER_POLICY_V4, METER_RULE_1_NUM)
         ##rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=0)
-        ##dash_db.set_app_db_entry("DASH_METER_RULE_TABLE", METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
+        ##dash_db.set_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM, METER_RULE_1_CONFIG)
         ##rule_v4_oid = dash_db.wait_for_asic_db_keys_exact(ASIC_METER_RULE_TABLE, exact_keys=1)
 
     def test_v6_meter(self, dash_db: DashDB):
@@ -113,7 +112,7 @@ class TestDash(TestFlexCountersBase):
         policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, policy_v6_oid)
         assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV6")
 
-        dash_db.set_app_db_entry("DASH_METER_RULE_TABLE", METER_POLICY_V6, METER_RULE_2_NUM, METER_RULE_2_CONFIG)
+        dash_db.set_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V6, METER_RULE_2_NUM, METER_RULE_2_CONFIG)
         oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES)
         for oid in oids:
             if oid != rule_v4_oid:
