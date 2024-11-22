@@ -28,65 +28,6 @@ DashMeterOrch::DashMeterOrch(DBConnector *db, const vector<string> &tables, Dash
     SWSS_LOG_ENTER();
 }
 
-bool DashMeterOrch::removeMeterRule(const string& key, MeterRuleBulkContext& ctxt)
-{
-    SWSS_LOG_ENTER();
-
-    bool exists = (meter_rule_entries_.find(key) != meter_rule_entries_.end());
-    if (!exists)
-    {
-        SWSS_LOG_WARN("Failed to find meter rule entry %s to remove", key.c_str());
-        return true;
-    }
-    if (isMeterPolicyBound(ctxt.meter_policy))
-    {
-        SWSS_LOG_WARN("Cannot remove rule from meter policy %s as it is already bound", ctxt.meter_policy.c_str());
-        return true;
-    }
-
-    auto& object_statuses = ctxt.object_statuses;
-    object_statuses.emplace_back();
-    meter_rule_bulker_.remove_entry(&object_statuses.back(), 
-                                    meter_rule_entries_[key].meter_rule_oid);
-
-    return false;
-}
-
-bool DashMeterOrch::removeMeterRulePost(const string& key, const MeterRuleBulkContext& ctxt)
-{
-    SWSS_LOG_ENTER();
-
-    const auto& object_statuses = ctxt.object_statuses;
-    if (object_statuses.empty())
-    {
-        return false;
-    }
-
-    auto it_status = object_statuses.begin();
-    sai_status_t status = *it_status++;
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        // Retry later if object has non-zero reference to it
-        if (status == SAI_STATUS_NOT_EXECUTED)
-        {
-            return false;
-        }
-        SWSS_LOG_ERROR("Failed to remove meter rule entry for %s", key.c_str());
-        task_process_status handle_status = handleSaiRemoveStatus((sai_api_t) SAI_API_DASH_METER, status);
-        if (handle_status != task_success)
-        {
-            return parseHandleSaiStatusFailure(handle_status);
-        }
-    }
-
-    gCrmOrch->decCrmResUsedCounter(isV4(ctxt.meter_policy) ? CrmResourceType::CRM_DASH_IPV4_METER_RULE : CrmResourceType::CRM_DASH_IPV6_METER_RULE);
-    meter_rule_entries_.erase(key);
-    decrMeterPolicyRuleCount(ctxt.meter_policy);
-    SWSS_LOG_INFO("Meter rule entry removed for %s", key.c_str());
-
-    return true;
-}
-
 sai_object_id_t DashMeterOrch::getMeterPolicyOid(const string& meter_policy) const
 {
     SWSS_LOG_ENTER();
@@ -147,7 +88,6 @@ void DashMeterOrch::decrMeterPolicyRuleCount(const string& meter_policy)
     auto it = meter_policy_entries_.find(meter_policy);
     if (it != meter_policy_entries_.end())
     {
-        it->second.rule_count += -1;
         if (it->second.rule_count > 0)
         {
             it->second.rule_count += -1;
@@ -223,231 +163,6 @@ bool DashMeterOrch::isMeterPolicyBound(const std::string& meter_policy) const
         return false;
     }
     return it->second.eni_bind_count > 0;
-}
-
-bool DashMeterOrch::addMeterRule(const string& key, MeterRuleBulkContext& ctxt)
-{
-    SWSS_LOG_ENTER();
-
-    bool exists = (meter_rule_entries_.find(key) != meter_rule_entries_.end());
-    if (exists)
-    {
-        SWSS_LOG_WARN("Meter rule entry already exists for %s", key.c_str());
-        return true;
-    }
-
-    if (isMeterPolicyBound(ctxt.meter_policy))
-    {
-        SWSS_LOG_WARN("Cannot add new rule %s to Meter policy %s as it is already bound", key.c_str(), ctxt.meter_policy.c_str());
-        return true;
-    }
-
-    sai_object_id_t meter_policy_oid = getMeterPolicyOid(ctxt.meter_policy);
-    if (meter_policy_oid == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_INFO("Retry for rule %s as meter policy %s not found", key.c_str(), ctxt.meter_policy.c_str());
-        return false;
-    }
-
-    auto& object_ids = ctxt.object_ids;
-    vector<sai_attribute_t> meter_rule_attrs;
-    sai_attribute_t meter_rule_attr;
-
-    meter_rule_attr.id = SAI_METER_RULE_ATTR_DIP;
-    to_sai(ctxt.metadata.ip_prefix().ip(), meter_rule_attr.value.ipaddr);
-    meter_rule_attrs.push_back(meter_rule_attr);
-
-    meter_rule_attr.id = SAI_METER_RULE_ATTR_DIP_MASK;
-    to_sai(ctxt.metadata.ip_prefix().mask(), meter_rule_attr.value.ipaddr);
-    meter_rule_attrs.push_back(meter_rule_attr);
-
-    meter_rule_attr.id = SAI_METER_RULE_ATTR_METER_POLICY_ID;
-    meter_rule_attr.value.oid = meter_policy_oid;
-    meter_rule_attrs.push_back(meter_rule_attr);
-
-    meter_rule_attr.id = SAI_METER_RULE_ATTR_METER_CLASS;
-    meter_rule_attr.value.u32 = (uint32_t) ctxt.metadata.metering_class(); // TBD 64 to 32 bit conversion
-    meter_rule_attrs.push_back(meter_rule_attr);
-
-    meter_rule_attr.id = SAI_METER_RULE_ATTR_PRIORITY;
-    meter_rule_attr.value.u32 = ctxt.metadata.priority();
-    meter_rule_attrs.push_back(meter_rule_attr);
-
-    object_ids.emplace_back();
-    meter_rule_bulker_.create_entry(&object_ids.back(), (uint32_t)meter_rule_attrs.size(), meter_rule_attrs.data());
-
-    return false;
-}
-
-bool DashMeterOrch::addMeterRulePost(const string& key, const MeterRuleBulkContext& ctxt)
-{
-    SWSS_LOG_ENTER();
-
-    const auto& object_ids = ctxt.object_ids;
-    if (object_ids.empty())
-    {
-        return false;
-    }
-
-    auto it_id = object_ids.begin();
-    sai_object_id_t id = *it_id++;
-    if (id == SAI_NULL_OBJECT_ID)
-    {
-        SWSS_LOG_ERROR("Failed to create meter rule entry for %s", key.c_str());
-        return false;
-    }
-
-    meter_rule_entries_[key] = { id, ctxt.metadata, ctxt.meter_policy, ctxt.rule_num };
-    incrMeterPolicyRuleCount(ctxt.meter_policy);
-
-    gCrmOrch->incCrmResUsedCounter(isV4(ctxt.meter_policy) ? CrmResourceType::CRM_DASH_IPV4_METER_RULE : CrmResourceType::CRM_DASH_IPV6_METER_RULE);
-    SWSS_LOG_INFO("Meter Rule entry for %s added", key.c_str());
-
-    return true;
-}
-
-void DashMeterOrch::doTaskMeterRuleTable(ConsumerBase& consumer)
-{
-    SWSS_LOG_ENTER();
-
-    auto it = consumer.m_toSync.begin();
-
-    while (it != consumer.m_toSync.end())
-    {
-        std::map<std::pair<std::string, std::string>,
-            MeterRuleBulkContext> toBulk;
-
-        while (it != consumer.m_toSync.end())
-        {
-            KeyOpFieldsValuesTuple tuple = it->second;
-            const string& key = kfvKey(tuple);
-            auto op = kfvOp(tuple);
-            auto rc = toBulk.emplace(std::piecewise_construct,
-                    std::forward_as_tuple(key, op),
-                    std::forward_as_tuple());
-            bool inserted = rc.second;
-            auto &ctxt = rc.first->second;
-
-            if (!inserted)
-            {
-                ctxt.clear();
-            }
-
-            string& meter_policy = ctxt.meter_policy;
-            uint32_t& rule_num   = ctxt.rule_num;
-
-            vector<string> keys = tokenize(key, ':');
-            meter_policy = keys[0];
-            string rule_num_str;
-            size_t pos = key.find(":", meter_policy.length());
-            rule_num_str = key.substr(pos + 1);
-            rule_num = stoi(rule_num_str);
-
-#if 0
-            string meter_policy; 
-            string rule_num_str;
-
-            if (!extractVariables(key, ':', meter_policy, rule_num_str))
-            {
-                SWSS_LOG_WARN("Failed to parse key %s", key.c_str());
-                it = consumer.m_toSync.erase(it);
-                continue;
-                //return task_failed;
-            }
-            ctxt.meter_policy = meter_policy;
-            ctxt.rule_num = stoi(rule_num_str);
-#endif
-
-            if (op == SET_COMMAND)
-            {
-                if (!parsePbMessage(kfvFieldsValues(tuple), ctxt.metadata))
-                {
-                    SWSS_LOG_WARN("Requires protobuff at MeterRule :%s", key.c_str());
-                    it = consumer.m_toSync.erase(it);
-                    continue;
-                }
-                if (addMeterRule(key, ctxt))
-                {
-                    it = consumer.m_toSync.erase(it);
-                }
-                else
-                {
-                    it++;
-                }
-            }
-            else if (op == DEL_COMMAND)
-            {
-                if (removeMeterRule(key, ctxt))
-                {
-                    it = consumer.m_toSync.erase(it);
-                }
-                else
-                {
-                    it++;
-                }
-            }
-            else
-            {
-                SWSS_LOG_ERROR("Unknown operation %s", op.c_str());
-                it = consumer.m_toSync.erase(it);
-            }
-        }
-
-        meter_rule_bulker_.flush();
-
-        auto it_prev = consumer.m_toSync.begin();
-        while (it_prev != it)
-        {
-            KeyOpFieldsValuesTuple t = it_prev->second;
-            string key = kfvKey(t);
-            string op = kfvOp(t);
-            auto found = toBulk.find(make_pair(key, op));
-            if (found == toBulk.end())
-            {
-                it_prev++;
-                continue;
-            }
-
-            const auto& ctxt = found->second;
-            const auto& object_statuses = ctxt.object_statuses;
-            const auto& object_ids = ctxt.object_ids;
-
-            if (op == SET_COMMAND)
-            {
-                if (object_ids.empty())
-                {
-                    it_prev++;
-                    continue;
-                }
-
-                if (addMeterRulePost(key, ctxt))
-                {
-                    it_prev = consumer.m_toSync.erase(it_prev);
-                }
-                else
-                {
-                    it_prev++;
-                }
-            }
-            else if (op == DEL_COMMAND)
-            {
-                if (object_statuses.empty())
-                {
-                    it_prev++;
-                    continue;
-                }
-
-                if (removeMeterRulePost(key, ctxt))
-                {
-                    it_prev = consumer.m_toSync.erase(it_prev);
-                }
-                else
-                {
-                    it_prev++;
-                }
-            }
-        }
-    }
 }
 
 bool DashMeterOrch::addMeterPolicy(const string& meter_policy, MeterPolicyContext& ctxt)
@@ -547,7 +262,7 @@ void DashMeterOrch::doTaskMeterPolicyTable(ConsumerBase& consumer)
             MeterPolicyContext ctxt;
             ctxt.meter_policy = key;
 
-            if (!parsePbMessage(kfvFieldsValues(tuple), ctxt.metadata)) 
+            if (!parsePbMessage(kfvFieldsValues(tuple), ctxt.metadata))
             {
                 SWSS_LOG_WARN("Requires protobuff at MeterPolicy :%s", key.c_str());
                 it = consumer.m_toSync.erase(it);
@@ -577,6 +292,277 @@ void DashMeterOrch::doTaskMeterPolicyTable(ConsumerBase& consumer)
         {
             SWSS_LOG_ERROR("Unknown operation %s", op.c_str());
             it = consumer.m_toSync.erase(it);
+        }
+    }
+}
+
+
+bool DashMeterOrch::addMeterRule(const string& key, MeterRuleBulkContext& ctxt)
+{
+    SWSS_LOG_ENTER();
+
+    bool exists = (meter_rule_entries_.find(key) != meter_rule_entries_.end());
+    if (exists)
+    {
+        SWSS_LOG_WARN("Meter rule entry already exists for %s", key.c_str());
+        return true;
+    }
+
+    if (isMeterPolicyBound(ctxt.meter_policy))
+    {
+        SWSS_LOG_WARN("Cannot add new rule %s to Meter policy %s as it is already bound", key.c_str(), ctxt.meter_policy.c_str());
+        return true;
+    }
+
+    sai_object_id_t meter_policy_oid = getMeterPolicyOid(ctxt.meter_policy);
+    if (meter_policy_oid == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_INFO("Retry for rule %s as meter policy %s not found", key.c_str(), ctxt.meter_policy.c_str());
+        return false;
+    }
+
+    auto& object_ids = ctxt.object_ids;
+    vector<sai_attribute_t> meter_rule_attrs;
+    sai_attribute_t meter_rule_attr;
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_DIP;
+    to_sai(ctxt.metadata.ip_prefix().ip(), meter_rule_attr.value.ipaddr);
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_DIP_MASK;
+    to_sai(ctxt.metadata.ip_prefix().mask(), meter_rule_attr.value.ipaddr);
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_METER_POLICY_ID;
+    meter_rule_attr.value.oid = meter_policy_oid;
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_METER_CLASS;
+    meter_rule_attr.value.u32 = (uint32_t) ctxt.metadata.metering_class(); // TBD 64 to 32 bit conversion
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+    meter_rule_attr.id = SAI_METER_RULE_ATTR_PRIORITY;
+    meter_rule_attr.value.u32 = ctxt.metadata.priority();
+    meter_rule_attrs.push_back(meter_rule_attr);
+
+    object_ids.emplace_back();
+    meter_rule_bulker_.create_entry(&object_ids.back(), (uint32_t)meter_rule_attrs.size(), meter_rule_attrs.data());
+
+    return false;
+}
+
+bool DashMeterOrch::addMeterRulePost(const string& key, const MeterRuleBulkContext& ctxt)
+{
+    SWSS_LOG_ENTER();
+
+    const auto& object_ids = ctxt.object_ids;
+    if (object_ids.empty())
+    {
+        return false;
+    }
+
+    auto it_id = object_ids.begin();
+    sai_object_id_t id = *it_id++;
+    if (id == SAI_NULL_OBJECT_ID)
+    {
+        SWSS_LOG_ERROR("Failed to create meter rule entry for %s", key.c_str());
+        return false;
+    }
+
+    meter_rule_entries_[key] = { id, ctxt.metadata, ctxt.meter_policy, ctxt.rule_num };
+    incrMeterPolicyRuleCount(ctxt.meter_policy);
+
+    gCrmOrch->incCrmResUsedCounter(isV4(ctxt.meter_policy) ? CrmResourceType::CRM_DASH_IPV4_METER_RULE : CrmResourceType::CRM_DASH_IPV6_METER_RULE);
+    SWSS_LOG_INFO("Meter Rule entry for %s added", key.c_str());
+
+    return true;
+}
+
+bool DashMeterOrch::removeMeterRule(const string& key, MeterRuleBulkContext& ctxt)
+{
+    SWSS_LOG_ENTER();
+
+    bool exists = (meter_rule_entries_.find(key) != meter_rule_entries_.end());
+    if (!exists)
+    {
+        SWSS_LOG_WARN("Failed to find meter rule entry %s to remove", key.c_str());
+        return true;
+    }
+    if (isMeterPolicyBound(ctxt.meter_policy))
+    {
+        SWSS_LOG_WARN("Cannot remove rule from meter policy %s as it is already bound", ctxt.meter_policy.c_str());
+        return true;
+    }
+
+    auto& object_statuses = ctxt.object_statuses;
+    object_statuses.emplace_back();
+    meter_rule_bulker_.remove_entry(&object_statuses.back(),
+                                    meter_rule_entries_[key].meter_rule_oid);
+
+    return false;
+}
+
+bool DashMeterOrch::removeMeterRulePost(const string& key, const MeterRuleBulkContext& ctxt)
+{
+    SWSS_LOG_ENTER();
+
+    const auto& object_statuses = ctxt.object_statuses;
+    if (object_statuses.empty())
+    {
+        return false;
+    }
+
+    auto it_status = object_statuses.begin();
+    sai_status_t status = *it_status++;
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        // Retry later if object has non-zero reference to it
+        if (status == SAI_STATUS_NOT_EXECUTED)
+        {
+            return false;
+        }
+        SWSS_LOG_ERROR("Failed to remove meter rule entry for %s", key.c_str());
+        task_process_status handle_status = handleSaiRemoveStatus((sai_api_t) SAI_API_DASH_METER, status);
+        if (handle_status != task_success)
+        {
+            return parseHandleSaiStatusFailure(handle_status);
+        }
+    }
+
+    gCrmOrch->decCrmResUsedCounter(isV4(ctxt.meter_policy) ? CrmResourceType::CRM_DASH_IPV4_METER_RULE : CrmResourceType::CRM_DASH_IPV6_METER_RULE);
+    meter_rule_entries_.erase(key);
+    decrMeterPolicyRuleCount(ctxt.meter_policy);
+    SWSS_LOG_INFO("Meter rule entry removed for %s", key.c_str());
+
+    return true;
+}
+
+
+void DashMeterOrch::doTaskMeterRuleTable(ConsumerBase& consumer)
+{
+    SWSS_LOG_ENTER();
+
+    auto it = consumer.m_toSync.begin();
+
+    while (it != consumer.m_toSync.end())
+    {
+        std::map<std::pair<std::string, std::string>,
+            MeterRuleBulkContext> toBulk;
+
+        while (it != consumer.m_toSync.end())
+        {
+            KeyOpFieldsValuesTuple tuple = it->second;
+            const string& key = kfvKey(tuple);
+            auto op = kfvOp(tuple);
+            auto rc = toBulk.emplace(std::piecewise_construct,
+                    std::forward_as_tuple(key, op),
+                    std::forward_as_tuple());
+            bool inserted = rc.second;
+            auto &ctxt = rc.first->second;
+
+            if (!inserted)
+            {
+                ctxt.clear();
+            }
+
+            string& meter_policy = ctxt.meter_policy;
+            uint32_t& rule_num   = ctxt.rule_num;
+
+            vector<string> keys = tokenize(key, ':');
+            meter_policy = keys[0];
+            string rule_num_str;
+            size_t pos = key.find(":", meter_policy.length());
+            rule_num_str = key.substr(pos + 1);
+            rule_num = stoi(rule_num_str);
+
+            if (op == SET_COMMAND)
+            {
+                if (!parsePbMessage(kfvFieldsValues(tuple), ctxt.metadata))
+                {
+                    SWSS_LOG_WARN("Requires protobuff at MeterRule :%s", key.c_str());
+                    it = consumer.m_toSync.erase(it);
+                    continue;
+                }
+                if (addMeterRule(key, ctxt))
+                {
+                    it = consumer.m_toSync.erase(it);
+                }
+                else
+                {
+                    it++;
+                }
+            }
+            else if (op == DEL_COMMAND)
+            {
+                if (removeMeterRule(key, ctxt))
+                {
+                    it = consumer.m_toSync.erase(it);
+                }
+                else
+                {
+                    it++;
+                }
+            }
+            else
+            {
+                SWSS_LOG_ERROR("Unknown operation %s", op.c_str());
+                it = consumer.m_toSync.erase(it);
+            }
+        }
+
+        meter_rule_bulker_.flush();
+
+        auto it_prev = consumer.m_toSync.begin();
+        while (it_prev != it)
+        {
+            KeyOpFieldsValuesTuple t = it_prev->second;
+            string key = kfvKey(t);
+            string op = kfvOp(t);
+            auto found = toBulk.find(make_pair(key, op));
+            if (found == toBulk.end())
+            {
+                it_prev++;
+                continue;
+            }
+
+            const auto& ctxt = found->second;
+            const auto& object_statuses = ctxt.object_statuses;
+            const auto& object_ids = ctxt.object_ids;
+
+            if (op == SET_COMMAND)
+            {
+                if (object_ids.empty())
+                {
+                    it_prev++;
+                    continue;
+                }
+
+                if (addMeterRulePost(key, ctxt))
+                {
+                    it_prev = consumer.m_toSync.erase(it_prev);
+                }
+                else
+                {
+                    it_prev++;
+                }
+            }
+            else if (op == DEL_COMMAND)
+            {
+                if (object_statuses.empty())
+                {
+                    it_prev++;
+                    continue;
+                }
+
+                if (removeMeterRulePost(key, ctxt))
+                {
+                    it_prev = consumer.m_toSync.erase(it_prev);
+                }
+                else
+                {
+                    it_prev++;
+                }
+            }
         }
     }
 }
