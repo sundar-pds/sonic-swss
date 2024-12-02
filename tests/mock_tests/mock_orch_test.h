@@ -58,6 +58,7 @@ namespace mock_orch_test
         DashVnetOrch *m_dashVnetOrch;
         DashRouteOrch *m_DashRouteOrch;
         DashTunnelOrch *m_DashTunnelOrch;
+        DashMeterOrch *m_DashMeterOrch;
 
         void PrepareSai();
         void SetUp();

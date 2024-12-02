@@ -13,6 +13,7 @@
 #define private public
 #include "dashorch.h"
 #include "dashrouteorch.h"
+#include "dashmeterorch.h"
 #include "bufferorch.h"
 #include "qosorch.h"
 #define protected public
