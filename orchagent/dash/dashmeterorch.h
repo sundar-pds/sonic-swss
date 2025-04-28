@@ -66,7 +66,7 @@ class DashMeterOrch : public ZmqOrch
 public:
     using TaskArgs = std::vector<swss::FieldValueTuple>;
 
-    DashMeterOrch(swss::DBConnector *db, const std::vector<std::string> &tables, DashOrch *dash_orch, swss::ZmqServer *zmqServer);
+    DashMeterOrch(swss::DBConnector *db, const std::vector<std::string> &tables, DashOrch *dash_orch, swss::DBConnector *app_state_db, swss::ZmqServer *zmqServer);
     sai_object_id_t getMeterPolicyOid(const std::string& meter_policy) const;
     int32_t getMeterPolicyEniBindCount(const std::string& meter_policy) const;
     void incrMeterPolicyEniBindCount(const std::string& meter_policy);

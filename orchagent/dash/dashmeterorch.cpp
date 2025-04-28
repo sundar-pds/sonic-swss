@@ -20,7 +20,8 @@ extern sai_object_id_t gSwitchId;
 extern size_t gMaxBulkSize;
 extern CrmOrch *gCrmOrch;
 
-DashMeterOrch::DashMeterOrch(DBConnector *db, const vector<string> &tables, DashOrch *dash_orch, ZmqServer *zmqServer) :
+
+DashMeterOrch::DashMeterOrch(DBConnector *db, const vector<string> &tables, DashOrch *dash_orch, DBConnector *app_state_db, ZmqServer *zmqServer) :
     meter_rule_bulker_(sai_dash_meter_api, gSwitchId, gMaxBulkSize),
     ZmqOrch(db, tables, zmqServer),
     m_dash_orch(dash_orch)
