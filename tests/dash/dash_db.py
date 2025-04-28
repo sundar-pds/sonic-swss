@@ -309,15 +309,3 @@ class DashDB(object):
 
     def remove_routing_type(self, routing_type):
         del self.app_dash_routing_type_table[str(routing_type)]
-
-    def create_meter_policy(self, meter_policy, attr_maps: dict):
-        self.app_dash_meter_policy_table[str(meter_policy)] = attr_maps
-
-    def remove_meter_policy(self, meter_policy):
-        del self.app_dash_meter_policy_table[str(meter_policy)]
-
-    def create_meter_rule(self, meter_policy, rule_num, attr_maps: dict):
-        self.app_dash_meter_rule_table[str(meter_policy) + ":" + str(rule_num)] = attr_maps
-
-    def remove_meter_rule(self, meter_policy, rule_num):
-        del self.app_dash_meter_rule_table[str(meter_policy) + ":" + str(rule_num)]

@@ -263,6 +263,14 @@ TUNNEL5_CONFIG = {
 }
 
 
+METER_POLICY_V4_CONFIG = {
+    "ip_version": IpVersion.IP_VERSION_IPV4
+}
+
+METER_POLICY_V6_CONFIG = {
+    "ip_version": IpVersion.IP_VERSION_IPV6
+}
+
 METER_RULE_1_CONFIG = {
     "priority": int(METER_RULE_1_PRIORITY),
     "metering_class": int(METER_RULE_1_METERING_CLASS),

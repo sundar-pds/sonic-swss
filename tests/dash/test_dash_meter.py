@@ -75,9 +75,10 @@ class TestDash(TestFlexCountersBase):
         global policy_v4_oid
         global rule_v4_oid
 
-        pb = MeterPolicy()
-        pb.ip_version = IpVersion.IP_VERSION_IPV4
-        dash_db.create_meter_policy(METER_POLICY_V4, {"pb": pb.SerializeToString()})
+        ###//pb = MeterPolicy()
+        ###//pb.ip_version = IpVersion.IP_VERSION_IPV4
+        ###//dash_db.create_meter_policy(METER_POLICY_V4, {"pb": pb.SerializeToString()})
+        dash_db.set_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V4, METER_POLICY_V4_CONFIG)
         policy_v4_oid = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)[0]
         policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, policy_v4_oid)
         assert_sai_attribute_exists("SAI_METER_POLICY_ATTR_IP_ADDR_FAMILY", policy_attrs, "SAI_IP_ADDR_FAMILY_IPV4")
@@ -95,9 +96,10 @@ class TestDash(TestFlexCountersBase):
         global policy_v6_oid
         global rule_v6_oid
 
-        pb = MeterPolicy()
-        pb.ip_version = IpVersion.IP_VERSION_IPV6
-        dash_db.create_meter_policy(METER_POLICY_V6, {"pb": pb.SerializeToString()})
+        ###//pb = MeterPolicy()
+        ###//pb.ip_version = IpVersion.IP_VERSION_IPV6
+        ###//dash_db.create_meter_policy(METER_POLICY_V6, {"pb": pb.SerializeToString()})
+        dash_db.set_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V6, METER_POLICY_V6_CONFIG)
         oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
         for oid in oids:
             if oid != policy_v4_oid:
@@ -144,8 +146,10 @@ class TestDash(TestFlexCountersBase):
         rule_found = False
 
         ### verify meter policy cannot be removed with ENI bound
-        dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
-        dash_db.remove_meter_policy(self.meter_policy_id)
+        ##//dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
+        ##//dash_db.remove_meter_policy(self.meter_policy_id)
+        dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, self.meter_policy_id, self.meter_policy_rule_num)
+        dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, self.meter_policy_id)
         time.sleep(20)
         meter_rule_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE, min_keys=ENTRIES)
         meter_policy_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
@@ -161,8 +165,10 @@ class TestDash(TestFlexCountersBase):
 
         ### remove ENI to allow meter rule/policy delete.
         dash_db.remove_eni(self.mac_string)
-        dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
-        dash_db.remove_meter_policy(self.meter_policy_id)
+        #// dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
+        #// dash_db.remove_meter_policy(self.meter_policy_id)
+        dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, self.meter_policy_id, self.meter_policy_rule_num)
+        dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, self.meter_policy_id)
         meter_rule_oids = dash_db.wait_for_asic_db_num_keys(ASIC_METER_RULE_TABLE, num_expected=ENTRIES-1)
         meter_policy_oids = dash_db.wait_for_asic_db_num_keys(ASIC_METER_POLICY_TABLE, num_expected=ENTRIES-1)
         assert meter_policy_oids[0] == policy_v6_oid
@@ -174,10 +180,14 @@ class TestDash(TestFlexCountersBase):
         self.vni = "3251"
         self.appliance_id = APPLIANCE_ID
         dash_db.remove_eni(self.mac_string)
-        dash_db.remove_meter_rule(METER_POLICY_V4, METER_RULE_1_NUM)
-        dash_db.remove_meter_rule(METER_POLICY_V6, METER_RULE_2_NUM)
-        dash_db.remove_meter_policy(METER_POLICY_V4)
-        dash_db.remove_meter_policy(METER_POLICY_V6)
+        ##//dash_db.remove_meter_rule(METER_POLICY_V4, METER_RULE_1_NUM)
+        ##//dash_db.remove_meter_rule(METER_POLICY_V6, METER_RULE_2_NUM)
+        ##//dash_db.remove_meter_policy(METER_POLICY_V4)
+        ##//dash_db.remove_meter_policy(METER_POLICY_V6)
+        dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM)
+        dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V6, METER_RULE_2_NUM)
+        dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V4)
+        dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V6)
         dash_db.remove_vnet(self.vnet)
         dash_db.remove_appliance(self.appliance_id)
         time.sleep(1)
