@@ -45,7 +45,6 @@ APP_DB_TO_PROTOBUF_MAP = {
     swsscommon.APP_DASH_ROUTING_TYPE_TABLE_NAME: RouteType,
     swsscommon.APP_DASH_METER_POLICY_TABLE_NAME: MeterPolicy,
     swsscommon.APP_DASH_METER_RULE_TABLE_NAME: MeterRule,
-    swsscommon.APP_DASH_ROUTE_GROUP_TABLE_NAME: RouteGroup
     swsscommon.APP_DASH_ROUTE_GROUP_TABLE_NAME: RouteGroup,
     swsscommon.APP_DASH_TUNNEL_TABLE_NAME: Tunnel
 }
