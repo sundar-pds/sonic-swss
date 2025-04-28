@@ -39,45 +39,21 @@ rule_v4_oid = 0
 rule_v6_oid = 0
 
 class TestDashMeter(TestFlexCountersBase):
-    def test_appliance(self, dash_db: DashDB):
-        self.appliance_id = APPLIANCE_ID
-        self.sip = SIP
-        self.vm_vni = VM_VNI
-        self.local_region_id = "10"
-        pb = Appliance()
-        pb.sip.ipv4 = socket.htonl(int(ipaddress.ip_address(self.sip)))
-        pb.vm_vni = int(self.vm_vni)
-        dash_db.create_appliance(self.appliance_id, {"pb": pb.SerializeToString()})
+    @pytest.fixture(autouse=True)
+    def common_setup_teardown(dash_db: DashDB):
+        dash_db.set_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID, APPLIANCE_CONFIG)
+        dash_db.set_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1, VNET_CONFIG)
+        # Don't set DASH_METER_*_TABLE and DASH_ENI_TABLE entries here for flexibility, test cases will set them as needed
 
-        direction_keys = dash_db.wait_for_asic_db_keys(ASIC_DIRECTION_LOOKUP_TABLE)
-        dl_attrs = dash_db.get_asic_db_entry(ASIC_DIRECTION_LOOKUP_TABLE, direction_keys[0])
-        assert_sai_attribute_exists("SAI_DIRECTION_LOOKUP_ENTRY_ATTR_ACTION", dl_attrs, "SAI_DIRECTION_LOOKUP_ENTRY_ACTION_SET_OUTBOUND_DIRECTION")
+        yield
 
-        vip_keys = dash_db.wait_for_asic_db_keys(ASIC_VIP_TABLE)
-        vip_attrs = dash_db.get_asic_db_entry(ASIC_VIP_TABLE, vip_keys[0])
-        assert_sai_attribute_exists("SAI_VIP_ENTRY_ATTR_ACTION", vip_attrs, "SAI_VIP_ENTRY_ACTION_ACCEPT")
-
-    def test_vnet(self, dash_db: DashDB):
-        self.vnet = "Vnet1"
-        self.vni = "45654"
-        self.guid = "559c6ce8-26ab-4193-b946-ccc6e8f930b2"
-        pb = Vnet()
-        pb.vni = int(self.vni)
-        pb.guid.value = bytes.fromhex(uuid.UUID(self.guid).hex)
-        dash_db.create_vnet(self.vnet, {"pb": pb.SerializeToString()})
-
-        vnet_keys = dash_db.wait_for_asic_db_keys(ASIC_VNET_TABLE)
-        self.vnet_oid = vnet_keys[0]
-        vnet_attr = dash_db.get_asic_db_entry(ASIC_VNET_TABLE, self.vnet_oid)
-        assert_sai_attribute_exists("SAI_VNET_ATTR_VNI", vnet_attr, self.vni)
+        dash_db.remove_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1)
+        dash_db.remove_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID)
 
     def test_v4_meter(self, dash_db: DashDB):
         global policy_v4_oid
         global rule_v4_oid
 
-        ###//pb = MeterPolicy()
-        ###//pb.ip_version = IpVersion.IP_VERSION_IPV4
-        ###//dash_db.create_meter_policy(METER_POLICY_V4, {"pb": pb.SerializeToString()})
         dash_db.set_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V4, METER_POLICY_V4_CONFIG)
         policy_v4_oid = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)[0]
         policy_attrs = dash_db.get_asic_db_entry(ASIC_METER_POLICY_TABLE, policy_v4_oid)
@@ -96,9 +72,6 @@ class TestDashMeter(TestFlexCountersBase):
         global policy_v6_oid
         global rule_v6_oid
 
-        ###//pb = MeterPolicy()
-        ###//pb.ip_version = IpVersion.IP_VERSION_IPV6
-        ###//dash_db.create_meter_policy(METER_POLICY_V6, {"pb": pb.SerializeToString()})
         dash_db.set_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V6, METER_POLICY_V6_CONFIG)
         oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE, min_keys=ENTRIES)
         for oid in oids:
@@ -146,8 +119,6 @@ class TestDashMeter(TestFlexCountersBase):
         rule_found = False
 
         ### verify meter policy cannot be removed with ENI bound
-        ##//dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
-        ##//dash_db.remove_meter_policy(self.meter_policy_id)
         dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, self.meter_policy_id, self.meter_rule_num)
         dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, self.meter_policy_id)
         time.sleep(20)
@@ -166,41 +137,16 @@ class TestDashMeter(TestFlexCountersBase):
         ### remove ENI to allow meter rule/policy delete.
         dash_db.remove_eni(self.mac_string)
 
-        #// dash_db.remove_meter_rule(self.meter_policy_id, self.meter_rule_num)
-        #// dash_db.remove_meter_policy(self.meter_policy_id)
-        ##//dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, self.meter_policy_id, self.meter_rule_num)
-        ##//dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, self.meter_policy_id)
-        ##//meter_rule_oids = dash_db.wait_for_asic_db_num_keys(ASIC_METER_RULE_TABLE, num_expected=ENTRIES-1)
-        ##//meter_policy_oids = dash_db.wait_for_asic_db_num_keys(ASIC_METER_POLICY_TABLE, num_expected=ENTRIES-1)
-        ##//assert meter_policy_oids[0] == policy_v6_oid
-        ##//assert meter_rule_oids[0] == rule_v6_oid
-
-        dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, self.meter_policy_id, self.meter_rule_num)
-        dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, self.meter_policy_id)
+        dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM)
+        dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V4)
         dash_db.wait_for_asic_db_key_del(ASIC_METER_RULE_TABLE, rule_v4_oid)
         dash_db.wait_for_asic_db_key_del(ASIC_METER_POLICY_TABLE, policy_v4_oid)
         meter_policy_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_POLICY_TABLE)
         meter_rule_oids = dash_db.wait_for_asic_db_keys(ASIC_METER_RULE_TABLE)
         assert meter_policy_oids[0] == policy_v6_oid
         assert meter_rule_oids[0] == rule_v6_oid
-
-    def test_cleanup(self, dash_db: DashDB):
-        self.vnet = VNET1
-        self.mac_string = "F4939FEFC47E"
-        self.vni = "3251"
-        self.appliance_id = APPLIANCE_ID
-        dash_db.remove_eni(self.mac_string)
-        ##//dash_db.remove_meter_rule(METER_POLICY_V4, METER_RULE_1_NUM)
-        ##//dash_db.remove_meter_rule(METER_POLICY_V6, METER_RULE_2_NUM)
-        ##//dash_db.remove_meter_policy(METER_POLICY_V4)
-        ##//dash_db.remove_meter_policy(METER_POLICY_V6)
-        dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM)
         dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V6, METER_RULE_2_NUM)
-        dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V4)
         dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V6)
-        dash_db.remove_vnet(self.vnet)
-        dash_db.remove_appliance(self.appliance_id)
-        time.sleep(1)
 
 # Add Dummy always-pass test at end as workaroud
 # for issue when Flaky fail on final test it invokes module tear-down

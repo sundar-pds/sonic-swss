@@ -145,20 +145,6 @@ class DashDB(object):
         _, keys = wait_for_result(polling_function, failure_message=f"Found fewer than {min_keys} keys in ASIC_DB table {table_name}")
         return keys
 
-
-    def wait_for_asic_db_num_keys(self, table_name, num_expected):
-        num_actual = -1
-
-        def polling_function():
-            nonlocal num_actual
-            table = Table(self.dvs.get_asic_db().db_connection, table_name)
-            keys = table.get_keys()
-            num_actual = len(keys)
-            return num_actual == num_expected, keys
-
-        _, keys = wait_for_result(polling_function, failure_message=f"Found {num_actual} keys rather than expected {num_expected} keys in ASIC_DB table {table_name}")
-        return keys
-
     def wait_for_asic_db_key_del(self, table_name, key):
         def polling_function():
             table = Table(self.dvs.get_asic_db().db_connection, table_name)
