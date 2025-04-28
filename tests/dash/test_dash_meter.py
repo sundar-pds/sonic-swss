@@ -39,16 +39,16 @@ rule_v4_oid = 0
 rule_v6_oid = 0
 
 class TestDashMeter(TestFlexCountersBase):
-    @pytest.fixture(autouse=True)
-    def common_setup_teardown(dash_db: DashDB):
-        dash_db.set_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID, APPLIANCE_CONFIG)
-        dash_db.set_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1, VNET_CONFIG)
-        # Don't set DASH_METER_*_TABLE and DASH_ENI_TABLE entries here for flexibility, test cases will set them as needed
+    ##//@pytest.fixture(autouse=True)
+    ##//def common_setup_teardown(dash_db: DashDB):
+    ##//    dash_db.set_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID, APPLIANCE_CONFIG)
+    ##//    dash_db.set_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1, VNET_CONFIG)
+    ##//    # Don't set DASH_METER_*_TABLE and DASH_ENI_TABLE entries here for flexibility, test cases will set them as needed
 
-        yield
+    ##//    yield
 
-        dash_db.remove_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1)
-        dash_db.remove_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID)
+    ##//    dash_db.remove_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1)
+    ##//    dash_db.remove_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID)
 
     def test_v4_meter(self, dash_db: DashDB):
         global policy_v4_oid
@@ -94,6 +94,8 @@ class TestDashMeter(TestFlexCountersBase):
         assert_sai_attribute_exists("SAI_METER_RULE_ATTR_DIP_MASK", rule_attrs, METER_RULE_2_IP_MASK)
 
     def test_eni(self, dash_db: DashDB):
+        dash_db.set_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID, APPLIANCE_CONFIG)
+        dash_db.set_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1, VNET_CONFIG)
         self.mac_string = "F4939FEFC47E"
         self.mac_address = "F4:93:9F:EF:C4:7E"
         pb = Eni()
@@ -136,6 +138,8 @@ class TestDashMeter(TestFlexCountersBase):
 
         ### remove ENI to allow meter rule/policy delete.
         dash_db.remove_eni(self.mac_string)
+        dash_db.remove_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1)
+        dash_db.remove_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID)
 
         dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V4, METER_RULE_1_NUM)
         dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V4)
@@ -147,6 +151,7 @@ class TestDashMeter(TestFlexCountersBase):
         assert meter_rule_oids[0] == rule_v6_oid
         dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, METER_POLICY_V6, METER_RULE_2_NUM)
         dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, METER_POLICY_V6)
+
 
 # Add Dummy always-pass test at end as workaroud
 # for issue when Flaky fail on final test it invokes module tear-down
