@@ -39,16 +39,6 @@ rule_v4_oid = 0
 rule_v6_oid = 0
 
 class TestDashMeter(TestFlexCountersBase):
-    ##//@pytest.fixture(autouse=True)
-    ##//def common_setup_teardown(dash_db: DashDB):
-    ##//    dash_db.set_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID, APPLIANCE_CONFIG)
-    ##//    dash_db.set_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1, VNET_CONFIG)
-    ##//    # Don't set DASH_METER_*_TABLE and DASH_ENI_TABLE entries here for flexibility, test cases will set them as needed
-
-    ##//    yield
-
-    ##//    dash_db.remove_app_db_entry(APP_DASH_VNET_TABLE_NAME, VNET1)
-    ##//    dash_db.remove_app_db_entry(APP_DASH_APPLIANCE_TABLE_NAME, APPLIANCE_ID)
 
     def test_v4_meter(self, dash_db: DashDB):
         global policy_v4_oid
