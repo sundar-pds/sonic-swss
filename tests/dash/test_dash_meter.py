@@ -110,7 +110,7 @@ class TestDashMeter(TestFlexCountersBase):
         policy_found = False
         rule_found = False
 
-        ### verify meter policy cannot be removed with ENI bound
+        ### verify meter policy cannot be removed with ENI bound to policy
         dash_db.remove_app_db_entry(APP_DASH_METER_RULE_TABLE_NAME, self.meter_policy_id, self.meter_rule_num)
         dash_db.remove_app_db_entry(APP_DASH_METER_POLICY_TABLE_NAME, self.meter_policy_id)
         time.sleep(20)
